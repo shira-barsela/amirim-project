@@ -5,6 +5,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 from typing import Tuple
+from torch.utils.data import Dataset, DataLoader
 
 # ===============================================================
 # Configuration
@@ -36,6 +37,7 @@ def generate_trajectory_harmonic(x0: float, v0: float, k: float, t: np.ndarray) 
 
 
 def generate_trajectory_quartic(x0: float, v0: float, k: float, t: np.ndarray) -> np.ndarray:
+  # Runge-Kutta 2nd-order
     dt = t[1] - t[0]
     x = [x0]
     v = [v0]
@@ -122,6 +124,26 @@ def generate_dataset(num_samples: int, t: np.ndarray, noise_std: float = NOISE_S
 
 
 # ===============================================================
+# Trajectory Dataset for PyTorch
+# ===============================================================
+class TrajectoryDataset(Dataset):
+    def __init__(self, csv_path: str):
+        self.df = pd.read_csv(csv_path)
+
+    def __len__(self):
+        return len(self.df)
+
+    def __getitem__(self, idx):
+        row = self.df.iloc[idx]
+        x = np.array(eval(row["x"]))
+        v = np.array(eval(row["v"]))
+        a = np.array(eval(row["a"]))
+        traj = np.stack([x, v, a], axis=0)  # shape: (3, T)
+        label = int(row["label"])
+        return torch.tensor(traj, dtype=torch.float32), torch.tensor(label, dtype=torch.long)
+
+
+# ===============================================================
 # Plot Example Trajectory
 # ===============================================================
 def plot_sample_trajectory(t: np.ndarray, x: np.ndarray):
@@ -154,3 +176,8 @@ if __name__ == "__main__":
     if len(df) > 0:
         sample_x = np.array(df.iloc[0]["x"])
         plot_sample_trajectory(t, sample_x)
+
+    # Load and inspect sample from PyTorch Dataset
+    dataset = TrajectoryDataset(SAVE_PATH)
+    sample, label = dataset[0]
+    print(f"Sample shape: {sample.shape}, Label: {label}")
