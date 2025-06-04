@@ -42,7 +42,7 @@ def main():
 
     if args.test:
         print("🧪 Running evaluation...")
-        evaluate_dataset(CSV_PATH, time_steps=TIME_STEPS)
+        evaluate_dataset(num_samples=200, time_steps=TIME_STEPS)
 
     if args.predict:
         print("🔮 Predicting a new trajectory...")

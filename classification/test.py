@@ -1,16 +1,36 @@
 import torch
-import pandas as pd
-from torch.utils.data import DataLoader
-from dataset import TrajectoryDataset
-from model import TrajectoryCNN
 import numpy as np
+from torch.utils.data import DataLoader, TensorDataset
+from model import TrajectoryCNN
+from data_generation import generate_dataset, compute_velocity_acceleration
 
 MODEL_PATH = "trained_model.pt"
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def evaluate_dataset(csv_path: str, batch_size: int = 32, time_steps: int = 200):
-    dataset = TrajectoryDataset(csv_path)
+def generate_test_tensor_dataset(num_samples=200, time_steps=200, duration=10.0):
+    t = np.linspace(0, duration, time_steps)
+    df = generate_dataset(num_samples=num_samples, t=t)
+
+    all_x = []
+    all_y = []
+
+    for i in range(len(df)):
+        x = np.array(df.iloc[i]["x"])
+        v = np.array(df.iloc[i]["v"])
+        a = np.array(df.iloc[i]["a"])
+        traj = np.stack([x, v, a], axis=0)  # (3, time_steps)
+        label = int(df.iloc[i]["label"])
+        all_x.append(traj)
+        all_y.append(label)
+
+    x_tensor = torch.tensor(np.array(all_x), dtype=torch.float32)
+    y_tensor = torch.tensor(np.array(all_y), dtype=torch.long)
+    return TensorDataset(x_tensor, y_tensor)
+
+
+def evaluate_dataset(num_samples=200, time_steps=200, batch_size=32):
+    dataset = generate_test_tensor_dataset(num_samples=num_samples, time_steps=time_steps)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
 
     model = TrajectoryCNN(time_steps=time_steps)
@@ -28,7 +48,7 @@ def evaluate_dataset(csv_path: str, batch_size: int = 32, time_steps: int = 200)
             total += batch_y.size(0)
 
     accuracy = correct / total
-    print(f"🧪 Test Accuracy: {accuracy:.2%}")
+    print(f"🧪 Test Accuracy on generated data: {accuracy:.2%}")
 
 
 def predict_single_trajectory(x: np.ndarray, v: np.ndarray, a: np.ndarray, time_steps: int = 200):
