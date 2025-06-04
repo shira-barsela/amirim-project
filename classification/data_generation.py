@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from typing import Tuple
 
 # Configuration (used if not overridden externally)
-DEFAULT_TIME_STEPS = 200
+DEFAULT_TIME_STEPS = 1000
 DEFAULT_DURATION = 10.0
 DEFAULT_NOISE_STD = 0.02
 DEFAULT_CLEAN_RATIO = 0.5
@@ -61,7 +61,7 @@ def generate_dataset(num_samples: int, t: np.ndarray, noise_std=DEFAULT_NOISE_ST
         except:
             bad_count += 1
             continue
-        if np.isnan(x).any() or np.abs(x).max() > 1e3:
+        if np.isnan(x).any() or np.abs(x).max() > 1e2:
             bad_count += 1
             continue
         if len(rows) >= num_clean and noise_std > 0:
