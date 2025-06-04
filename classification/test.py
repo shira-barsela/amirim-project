@@ -105,10 +105,6 @@ def generate_test_set(num_samples, t, test_type):
         else:
             raise ValueError("Invalid test type")
 
-        if not (torch.isnan(traj[:, 0]).any() or torch.abs(traj[:, 0]).max() > 1e3):
-            data.append(traj[:, 0])
-            labels.append(label)
-
     return torch.stack(data), torch.tensor(labels)
 
 
@@ -122,7 +118,7 @@ model.eval()
 # ===============================
 # Generate Test Set
 # ===============================
-x_test, y_test = generate_test_set(15, t, test_type=TEST_TYPE)
+x_test, y_test = generate_test_set(5, t, test_type=TEST_TYPE)
 x_test = x_test.to(device)
 y_test = y_test.to(device)
 
