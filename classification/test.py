@@ -14,6 +14,7 @@ def generate_test_tensor_dataset(num_samples=200, time_steps=200, duration=10.0)
 
     all_x = []
     all_y = []
+    all_k = []
 
     for i in range(len(df)):
         x = np.array(df.iloc[i]["x"])
@@ -21,12 +22,15 @@ def generate_test_tensor_dataset(num_samples=200, time_steps=200, duration=10.0)
         a = np.array(df.iloc[i]["a"])
         traj = np.stack([x, v, a], axis=0)  # (3, time_steps)
         label = int(df.iloc[i]["label"])
+        k = float(df.iloc[i]["k"])
         all_x.append(traj)
         all_y.append(label)
+        all_k.append(k)
 
     x_tensor = torch.tensor(np.array(all_x), dtype=torch.float32)
     y_tensor = torch.tensor(np.array(all_y), dtype=torch.long)
-    return TensorDataset(x_tensor, y_tensor)
+    k_tensor = torch.tensor(np.array(all_k), dtype=torch.float32)
+    return TensorDataset(x_tensor, y_tensor, k_tensor)
 
 
 def evaluate_dataset(num_samples=200, time_steps=200, batch_size=32):
@@ -39,16 +43,19 @@ def evaluate_dataset(num_samples=200, time_steps=200, batch_size=32):
     model.eval()
 
     correct, total = 0, 0
+    k_errors = []
     with torch.no_grad():
-        for batch_x, batch_y in dataloader:
-            batch_x, batch_y = batch_x.to(DEVICE), batch_y.to(DEVICE)
-            outputs = model(batch_x)
-            preds = outputs.argmax(dim=1)
+        for batch_x, batch_y, batch_k in dataloader:
+            batch_x, batch_y, batch_k = batch_x.to(DEVICE), batch_y.to(DEVICE), batch_k.to(DEVICE)
+            logits, k_pred = model(batch_x)
+            preds = logits.argmax(dim=1)
             correct += (preds == batch_y).sum().item()
             total += batch_y.size(0)
+            k_errors.extend((k_pred.squeeze() - batch_k).abs().cpu().tolist())
 
     accuracy = correct / total
-    print(f"🧪 Test Accuracy on generated data: {accuracy:.2%}")
+    mae_k = sum(k_errors) / len(k_errors)
+    print(f"🧪 Test Accuracy: {accuracy:.2%} | MAE(k): {mae_k:.4f}")
 
 
 def predict_single_trajectory(x: np.ndarray, v: np.ndarray, a: np.ndarray, time_steps: int = 200):
@@ -62,10 +69,11 @@ def predict_single_trajectory(x: np.ndarray, v: np.ndarray, a: np.ndarray, time_
     model.eval()
 
     with torch.no_grad():
-        output = model(input_tensor)
-        predicted_class = torch.argmax(output, dim=1).item()
-        confidence = torch.softmax(output, dim=1)[0, predicted_class].item()
+        logits, k_pred = model(input_tensor)
+        predicted_class = torch.argmax(logits, dim=1).item()
+        confidence = torch.softmax(logits, dim=1)[0, predicted_class].item()
+        k_value = k_pred.item()
 
     label_map = {0: "harmonic", 1: "quartic"}
-    print(f"🔍 Prediction: {label_map[predicted_class]} (confidence: {confidence:.2%})")
-    return predicted_class, confidence
+    print(f"🔍 Prediction: {label_map[predicted_class]} (confidence: {confidence:.2%}, predicted k: {k_value:.4f})")
+    return predicted_class, confidence, k_value

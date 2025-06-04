@@ -12,7 +12,7 @@ class TrajectoryDataset(Dataset):
     def __len__(self) -> int:
         return len(self.df)
 
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         row = self.df.iloc[idx]
 
         # Convert stringified lists to arrays
@@ -23,5 +23,10 @@ class TrajectoryDataset(Dataset):
         # Stack into shape (channels=3, time_steps)
         traj = np.stack([x, v, a], axis=0)
         label = int(row["label"])
+        k_value = float(row["k"])
 
-        return torch.tensor(traj, dtype=torch.float32), torch.tensor(label, dtype=torch.long)
+        return (
+            torch.tensor(traj, dtype=torch.float32),
+            torch.tensor(label, dtype=torch.long),
+            torch.tensor(k_value, dtype=torch.float32)
+        )

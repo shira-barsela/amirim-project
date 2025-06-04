@@ -13,6 +13,7 @@ EPOCHS = 20
 LEARNING_RATE = 1e-3
 VALIDATION_SPLIT = 0.2
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+LAMBDA_K = 1.0  # weight for regression loss
 
 
 def train_model(csv_path: str, time_steps: int = 200):
@@ -25,11 +26,13 @@ def train_model(csv_path: str, time_steps: int = 200):
     val_loader = DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=False)
 
     model = TrajectoryCNN(time_steps=time_steps).to(DEVICE)
-    criterion = nn.CrossEntropyLoss()
+    criterion_class = nn.CrossEntropyLoss()
+    criterion_k = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
     train_losses = []
     val_accuracies = []
+    val_k_errors = []
 
     for epoch in range(EPOCHS):
         model.train()
@@ -37,18 +40,20 @@ def train_model(csv_path: str, time_steps: int = 200):
         correct = 0
         total = 0
 
-        for batch_x, batch_y in train_loader:
-            batch_x, batch_y = batch_x.to(DEVICE), batch_y.to(DEVICE)
+        for batch_x, batch_y, batch_k in train_loader:
+            batch_x, batch_y, batch_k = batch_x.to(DEVICE), batch_y.to(DEVICE), batch_k.to(DEVICE)
 
-            outputs = model(batch_x)
-            loss = criterion(outputs, batch_y)
+            logits, k_pred = model(batch_x)
+            loss_class = criterion_class(logits, batch_y)
+            loss_k = criterion_k(k_pred.squeeze(), batch_k)
+            loss = loss_class + LAMBDA_K * loss_k
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
             total_loss += loss.item() * batch_x.size(0)
-            preds = outputs.argmax(dim=1)
+            preds = logits.argmax(dim=1)
             correct += (preds == batch_y).sum().item()
             total += batch_y.size(0)
 
@@ -59,27 +64,32 @@ def train_model(csv_path: str, time_steps: int = 200):
         model.eval()
         val_correct = 0
         val_total = 0
+        k_errors = []
         with torch.no_grad():
-            for batch_x, batch_y in val_loader:
-                batch_x, batch_y = batch_x.to(DEVICE), batch_y.to(DEVICE)
-                outputs = model(batch_x)
-                preds = outputs.argmax(dim=1)
+            for batch_x, batch_y, batch_k in val_loader:
+                batch_x, batch_y, batch_k = batch_x.to(DEVICE), batch_y.to(DEVICE), batch_k.to(DEVICE)
+                logits, k_pred = model(batch_x)
+                preds = logits.argmax(dim=1)
                 val_correct += (preds == batch_y).sum().item()
                 val_total += batch_y.size(0)
+                k_errors.extend((k_pred.squeeze() - batch_k).abs().cpu().tolist())
 
         val_acc = val_correct / val_total
+        avg_k_error = sum(k_errors) / len(k_errors)
         val_accuracies.append(val_acc)
+        val_k_errors.append(avg_k_error)
 
-        print(f"Epoch {epoch+1:03d} | Loss: {train_loss:.4f} | Val Acc: {val_acc:.2%}")
+        print(f"Epoch {epoch+1:03d} | Loss: {train_loss:.4f} | Val Acc: {val_acc:.2%} | Val MAE(k): {avg_k_error:.4f}")
 
     # Save model
     torch.save(model.state_dict(), MODEL_PATH)
     print(f"💾 Model saved to {MODEL_PATH}")
 
-    # Plot training curve
+    # Plot training curves
     plt.figure(figsize=(10, 4))
     plt.plot(train_losses, label="Train Loss")
     plt.plot(val_accuracies, label="Val Accuracy")
+    plt.plot(val_k_errors, label="Val MAE(k)")
     plt.xlabel("Epoch")
     plt.ylabel("Metric")
     plt.grid(True)

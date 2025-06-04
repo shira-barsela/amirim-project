@@ -1,6 +1,7 @@
 import argparse
 import numpy as np
 import os
+import pandas as pd
 from data_generation import generate_dataset, save_dataset, plot_sample_trajectory
 from train import train_model
 from test import evaluate_dataset, predict_single_trajectory
@@ -46,8 +47,6 @@ def main():
 
     if args.predict:
         print("🔮 Predicting a new trajectory...")
-        # Example: user supplies their own x, v, a arrays here
-        # Replace with real values when needed
         x = np.sin(2 * np.pi * np.linspace(0, 1, TIME_STEPS))
         v = np.gradient(x, t[1] - t[0])
         a = np.gradient(v, t[1] - t[0])
