@@ -4,6 +4,7 @@ from torch.utils.data import DataLoader, TensorDataset
 import matplotlib.pyplot as plt
 from model import TrajectoryCNN
 from data_generation import generate_dataset, compute_velocity_acceleration
+from scipy.integrate import solve_ivp
 
 MODEL_PATH = "trained_model.pt"
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -11,25 +12,16 @@ OMEGA_RANGE = (5.0, 10.0)
 
 
 def simulate_cos_potential(x0, v0, k, omega, t, power):
-    dt = t[1] - t[0]
-    x, v = [x0], [v0]
-    for i in range(1, len(t)):
-        xi, vi = x[-1], v[-1]
-        ti = t[i - 1]
+    def cos_rhs(ti, y):
+        x, v = y
+        dxdt = v
+        dvdt = -0.5 * k * power * np.cos(omega * ti) * x ** (power - 1)
+        return [dxdt, dvdt]
 
-        # a1 at start
-        a1 = -k * 0.5 * power * np.cos(omega * ti) * xi ** (power - 1)
-        vi_half = vi + 0.5 * a1 * dt
-        xi_half = xi + 0.5 * vi * dt
-
-        # a2 at midpoint
-        a2 = -k * 0.5 * power * np.cos(omega * (ti + 0.5 * dt)) * xi_half ** (power - 1)
-        vi_new = vi + a2 * dt
-        xi_new = xi + vi_half * dt
-
-        x.append(xi_new)
-        v.append(vi_new)
-    return np.array(x)
+    sol = solve_ivp(cos_rhs, [t[0], t[-1]], [x0, v0], t_eval=t, method='RK45')
+    if sol.status != 0:
+        raise RuntimeError("solve_ivp failed in simulate_cos_potential")
+    return sol.y[0]
 
 def evaluate_harmonic_quartic_testset(csv_path=None, num_samples=200, time_steps=200, batch_size=32):
     if csv_path:

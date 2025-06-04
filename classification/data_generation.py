@@ -3,6 +3,8 @@ import pandas as pd
 import os
 import matplotlib.pyplot as plt
 from typing import Tuple
+from scipy.integrate import solve_ivp
+
 
 # Configuration (used if not overridden externally)
 DEFAULT_TIME_STEPS = 1000
@@ -22,19 +24,16 @@ def generate_trajectory_harmonic(x0: float, v0: float, k: float, t: np.ndarray) 
 
 
 def generate_trajectory_quartic(x0: float, v0: float, k: float, t: np.ndarray) -> np.ndarray:
-    dt = t[1] - t[0]
-    x, v = [x0], [v0]
-    for _ in range(1, len(t)):
-        xi, vi = x[-1], v[-1]
-        a1 = -2 * k * xi**3
-        vi_half = vi + 0.5 * a1 * dt
-        xi_half = xi + 0.5 * vi * dt
-        a2 = -2 * k * xi_half**3
-        vi_new = vi + a2 * dt
-        xi_new = xi + vi_half * dt
-        x.append(xi_new)
-        v.append(vi_new)
-    return np.array(x)
+    def quartic_rhs(t, y):
+        x, v = y
+        dxdt = v
+        dvdt = -2 * k * x**3
+        return [dxdt, dvdt]
+
+    sol = solve_ivp(quartic_rhs, [t[0], t[-1]], [x0, v0], t_eval=t, method='RK45')
+    if sol.status != 0:
+        raise RuntimeError("solve_ivp failed in generate_trajectory_quartic")
+    return sol.y[0]
 
 
 def compute_velocity_acceleration(x: np.ndarray, t: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
