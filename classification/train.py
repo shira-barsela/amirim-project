@@ -5,7 +5,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 from typing import Tuple
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, random_split
 
 # ===============================================================
 # Configuration
@@ -17,167 +17,113 @@ torch.manual_seed(SEED)
 SAVE_PATH = "dataset.csv"
 PLOT_PATH = "sample_trajectory.png"
 NUM_SAMPLES = 1000
-TIME_STEPS = 200  # higher resolution
-DURATION = 10.0  # seconds
+TIME_STEPS = 200
+DURATION = 10.0
 NOISE_STD = 0.02
-CLEAN_RATIO = 0.5  # fraction of clean data, rest will be noisy
+CLEAN_RATIO = 0.5
+VALIDATION_SPLIT = 0.2
 
 K_RANGE = (0.5, 3.0)
-X0_RANGE = (-2.0, 2.0)  # widened range
-V0_RANGE = (-2.0, 2.0)  # widened range
+X0_RANGE = (-2.0, 2.0)
+V0_RANGE = (-2.0, 2.0)
+BATCH_SIZE = 32
+EPOCHS = 20
+LEARNING_RATE = 1e-3
 
 
 # ===============================================================
-# Motion Equations
+# CNN Classifier Definition
 # ===============================================================
-def generate_trajectory_harmonic(x0: float, v0: float, k: float, t: np.ndarray) -> np.ndarray:
-    omega = np.sqrt(k)
-    x = x0 * np.cos(omega * t) + (v0 / omega) * np.sin(omega * t)
-    return x
+class TrajectoryCNN(nn.Module):
+    def __init__(self, in_channels=3, num_classes=2):
+        super(TrajectoryCNN, self).__init__()
+        self.net = nn.Sequential(
+            nn.Conv1d(in_channels, 32, kernel_size=5, padding=2),
+            nn.ReLU(),
+            nn.MaxPool1d(2),
+            nn.Conv1d(32, 64, kernel_size=5, padding=2),
+            nn.ReLU(),
+            nn.MaxPool1d(2),
+            nn.Flatten(),
+            nn.Linear(64 * (TIME_STEPS // 4), 128),
+            nn.ReLU(),
+            nn.Linear(128, num_classes)
+        )
 
-
-def generate_trajectory_quartic(x0: float, v0: float, k: float, t: np.ndarray) -> np.ndarray:
-  # Runge-Kutta 2nd-order
-    dt = t[1] - t[0]
-    x = [x0]
-    v = [v0]
-
-    for i in range(1, len(t)):
-        xi = x[-1]
-        vi = v[-1]
-        a1 = -2 * k * xi**3
-
-        # Midpoint estimates
-        vi_half = vi + 0.5 * a1 * dt
-        xi_half = xi + 0.5 * vi * dt
-        a2 = -2 * k * xi_half**3
-
-        # RK2 (midpoint) update
-        vi_new = vi + a2 * dt
-        xi_new = xi + vi_half * dt
-
-        x.append(xi_new)
-        v.append(vi_new)
-
-    return np.array(x)
-
-
-def compute_velocity_acceleration(x: np.ndarray, t: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-    dt = t[1] - t[0]
-    v = np.gradient(x, dt)
-    a = np.gradient(v, dt)
-    return v, a
+    def forward(self, x):
+        return self.net(x)
 
 
 # ===============================================================
-# Dataset Generator
+# Training Loop with Validation and Plotting
 # ===============================================================
-def generate_dataset(num_samples: int, t: np.ndarray, noise_std: float = NOISE_STD, clean_ratio: float = CLEAN_RATIO) -> pd.DataFrame:
-    rows = []
-    bad_count = 0
-    potential_types = ["harmonic", "quartic"]
-    labels = {"harmonic": 0, "quartic": 1}
+def train_model():
+    dataset = TrajectoryDataset(SAVE_PATH)
+    val_size = int(VALIDATION_SPLIT * len(dataset))
+    train_size = len(dataset) - val_size
+    train_set, val_set = random_split(dataset, [train_size, val_size])
 
-    num_clean = int(num_samples * clean_ratio)
-    num_noisy = num_samples - num_clean
+    train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True)
+    val_loader = DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=False)
 
-    while len(rows) < num_samples:
-        x0 = np.random.uniform(*X0_RANGE)
-        v0 = np.random.uniform(*V0_RANGE)
-        k = np.random.uniform(*K_RANGE)
-        potential_type = np.random.choice(potential_types)
-        label = labels[potential_type]
+    model = TrajectoryCNN().to("cuda" if torch.cuda.is_available() else "cpu")
+    criterion = nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
-        try:
-            if potential_type == "harmonic":
-                x = generate_trajectory_harmonic(x0, v0, k, t)
-            else:
-                x = generate_trajectory_quartic(x0, v0, k, t)
-        except Exception as e:
-            bad_count += 1
-            continue
+    train_losses = []
+    val_accuracies = []
 
-        if np.isnan(x).any() or np.abs(x).max() > 1e3:
-            bad_count += 1
-            continue
+    for epoch in range(EPOCHS):
+        model.train()
+        total_loss = 0
+        correct = 0
+        total = 0
 
-        apply_noise = (len(rows) >= num_clean)
-        if apply_noise and noise_std > 0:
-            x += np.random.normal(0, noise_std, size=x.shape)
+        for batch_x, batch_y in train_loader:
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            batch_x, batch_y = batch_x.to(device), batch_y.to(device)
 
-        v, a = compute_velocity_acceleration(x, t)
+            outputs = model(batch_x)
+            loss = criterion(outputs, batch_y)
 
-        row = {
-            "x0": x0,
-            "v0": v0,
-            "k": k,
-            "label": label,
-            "x": x.tolist(),
-            "v": v.tolist(),
-            "a": a.tolist(),
-        }
-        rows.append(row)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
 
-    print(f"❌ Ignored {bad_count} bad trajectories.")
-    df = pd.DataFrame(rows)
-    return df
+            total_loss += loss.item() * batch_x.size(0)
+            preds = outputs.argmax(dim=1)
+            correct += (preds == batch_y).sum().item()
+            total += batch_y.size(0)
 
+        train_losses.append(total_loss / total)
 
-# ===============================================================
-# Trajectory Dataset for PyTorch
-# ===============================================================
-class TrajectoryDataset(Dataset):
-    def __init__(self, csv_path: str):
-        self.df = pd.read_csv(csv_path)
+        model.eval()
+        val_correct = 0
+        val_total = 0
+        with torch.no_grad():
+            for batch_x, batch_y in val_loader:
+                device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+                batch_x, batch_y = batch_x.to(device), batch_y.to(device)
+                outputs = model(batch_x)
+                preds = outputs.argmax(dim=1)
+                val_correct += (preds == batch_y).sum().item()
+                val_total += batch_y.size(0)
 
-    def __len__(self):
-        return len(self.df)
+        val_acc = val_correct / val_total
+        val_accuracies.append(val_acc)
 
-    def __getitem__(self, idx):
-        row = self.df.iloc[idx]
-        x = np.array(eval(row["x"]))
-        v = np.array(eval(row["v"]))
-        a = np.array(eval(row["a"]))
-        traj = np.stack([x, v, a], axis=0)  # shape: (3, T)
-        label = int(row["label"])
-        return torch.tensor(traj, dtype=torch.float32), torch.tensor(label, dtype=torch.long)
+        print(f"Epoch {epoch + 1:03d}: Loss = {train_losses[-1]:.4f}, Val Accuracy = {val_acc:.2%}")
 
-
-# ===============================================================
-# Plot Example Trajectory
-# ===============================================================
-def plot_sample_trajectory(t: np.ndarray, x: np.ndarray):
+    # Plotting
     plt.figure(figsize=(10, 4))
-    plt.plot(t, x, label="x(t)")
-    plt.title("Sample Trajectory")
-    plt.xlabel("Time (s)")
-    plt.ylabel("x(t)")
+    plt.plot(train_losses, label='Train Loss')
+    plt.plot(val_accuracies, label='Val Accuracy')
+    plt.xlabel("Epoch")
+    plt.ylabel("Metric")
+    plt.title("Training Progress")
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
-    plt.savefig(PLOT_PATH)
-    print(f"✅ Saved sample plot to {PLOT_PATH}")
+    plt.savefig("training_progress.png")
+    print("📊 Saved training progress plot to training_progress.png")
     plt.close()
-
-
-# ===============================================================
-# Main Execution
-# ===============================================================
-if __name__ == "__main__":
-    t = np.linspace(0, DURATION, TIME_STEPS)
-    df = generate_dataset(NUM_SAMPLES, t, noise_std=NOISE_STD, clean_ratio=CLEAN_RATIO)
-    print(f"✅ Generated dataset with {len(df)} samples")
-
-    # Save CSV with reduced precision for smaller size
-    df.to_csv(SAVE_PATH, index=False, float_format='%.5f')
-    print(f"💾 Saved dataset to {SAVE_PATH}")
-
-    # Plot a sample
-    if len(df) > 0:
-        sample_x = np.array(df.iloc[0]["x"])
-        plot_sample_trajectory(t, sample_x)
-
-    # Load and inspect sample from PyTorch Dataset
-    dataset = TrajectoryDataset(SAVE_PATH)
-    sample, label = dataset[0]
-    print(f"Sample shape: {sample.shape}, Label: {label}")
