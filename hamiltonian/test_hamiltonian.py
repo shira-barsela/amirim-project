@@ -4,99 +4,123 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader, Dataset
-
 from model_hamiltonian import HamiltonPredictorCNN
-from data_hamiltonian import generate_dataset, DEFAULT_DURATION, DEFAULT_TIME_STEPS
-from dataset_hamiltonian import HamiltonDataset
+from data_hamiltonian import generate_dataset, harmonic_trajectory, DEFAULT_DURATION, DEFAULT_TIME_STEPS
+from dataset_hamiltonian import compute_v_and_a
 
 # ========= CONFIG =========
-NUM_TRAJECTORIES = 50
 MODEL_PATH = "models/hamiltonian_cnn.pth"
-BATCH_SIZE = 64
-NUM_PLOTS = 5
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+DT = DEFAULT_DURATION / (DEFAULT_TIME_STEPS - 1)  # default time step
 
 
-# ========= Custom Dataset Using In-Memory Array =========
-class InMemoryHamiltonDataset(Dataset):
-    def __init__(self, data_array, duration=DEFAULT_DURATION, time_steps=DEFAULT_TIME_STEPS):
-        self.raw_data = data_array
-        self.inputs = data_array[:, 4:-1]  # x_0 to x_9
-        self.targets = data_array[:, -1]   # target x_10
-        self.dt = duration / (time_steps - 1)
+# ========= Batch Evaluation =========
+def run_batch_evaluation(model, num_trajectories=50, num_plots=5, batch_size=64):
+    class InMemoryHamiltonDataset(Dataset):
+        def __init__(self, data_array, dt):
+            self.inputs = data_array[:, 4:-1]
+            self.targets = data_array[:, -1]
+            self.dt = dt
 
-    def __len__(self):
-        return len(self.inputs)
+        def __len__(self):
+            return len(self.inputs)
 
-    def __getitem__(self, idx):
-        x = self.inputs[idx].astype(np.float32)
+        def __getitem__(self, idx):
+            x = self.inputs[idx].astype(np.float32)
+            v, a = compute_v_and_a(x, self.dt)
+            input_tensor = torch.tensor(np.stack([x, v, a]), dtype=torch.float32)
+            target = torch.tensor(self.targets[idx], dtype=torch.float32)
+            return input_tensor, target
 
-        # Compute velocity
-        v = np.zeros_like(x)
-        v[1:-1] = (x[2:] - x[:-2]) / (2 * self.dt)
-        v[0] = (x[1] - x[0]) / self.dt
-        v[-1] = (x[-1] - x[-2]) / self.dt
+    print("🔄 Generating fresh test data...")
+    raw_data = generate_dataset(num_trajectories)
+    dataset = InMemoryHamiltonDataset(raw_data, dt=DT)
+    loader = DataLoader(dataset, batch_size=batch_size)
 
-        # Compute acceleration
-        a = np.zeros_like(x)
-        a[1:-1] = (x[2:] - 2 * x[1:-1] + x[:-2]) / (self.dt ** 2)
-        a[0] = (x[2] - 2 * x[1] + x[0]) / (self.dt ** 2)
-        a[-1] = (x[-1] - 2 * x[-2] + x[-3]) / (self.dt ** 2)
+    print("📊 Evaluating...")
+    model.eval()
+    all_targets, all_preds = [], []
+    with torch.no_grad():
+        for x, y in loader:
+            x, y = x.to(DEVICE), y.to(DEVICE)
+            pred = model(x)
+            all_targets.append(y.cpu().numpy())
+            all_preds.append(pred.cpu().numpy())
 
-        input_tensor = torch.tensor(np.stack([x, v, a]), dtype=torch.float32)
-        target = torch.tensor(self.targets[idx], dtype=torch.float32)
-        return input_tensor, target
+    all_targets = np.concatenate(all_targets)
+    all_preds = np.concatenate(all_preds)
+    mse = np.mean((all_targets - all_preds) ** 2)
+    print(f"📉 Test MSE on fresh data: {mse:.6f}")
+
+    print("📈 Plotting random samples...")
+    indices = np.random.choice(len(dataset), size=num_plots, replace=False)
+    t_values = np.linspace(0, DT * 10, 11)
+
+    for i, idx in enumerate(indices):
+        x, y_true = dataset[idx]
+        x_vals = x[0].numpy()
+        input_tensor = x.unsqueeze(0).to(DEVICE)
+        y_pred = model(input_tensor).item()
+
+        plt.figure(figsize=(8, 4))
+        plt.plot(t_values[:10], x_vals, marker='o', label="Input x(t)")
+        plt.plot(t_values[10], y_true.item(), 'go', label="True x₁₀")
+        plt.plot(t_values[10], y_pred, 'rx', label="Predicted x₁₀")
+        plt.title(f"Sample #{i+1} (Index {idx})")
+        plt.xlabel("Time (s)")
+        plt.ylabel("Position x(t)")
+        plt.grid(True)
+        plt.legend()
+        plt.show()
 
 
-# ========= Generate Fresh Test Data =========
-print("🔄 Generating fresh test dataset...")
-raw_data = generate_dataset(NUM_TRAJECTORIES)
-test_dataset = InMemoryHamiltonDataset(raw_data)
-test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE)
+# ========= Multi-Step Rollout =========
+def rollout_from_initial_condition(model, x0, v0, k, steps=DEFAULT_TIME_STEPS):
+    t = np.linspace(0, DT * (steps - 1), steps)
+    print("duration: ", DT * (steps - 1), ", steps: ", steps)
+    true_x = harmonic_trajectory(x0, v0, k, t)
 
-# ========= Load Model =========
-model = HamiltonPredictorCNN().to(DEVICE)
-model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
-model.eval()
-print(f"✅ Loaded model from {MODEL_PATH}")
+    current_window = true_x[:10].astype(np.float32).copy()
+    predicted = list(current_window)
 
-# ========= Evaluate =========
-all_targets = []
-all_preds = []
+    model.eval()
+    for i in range(10, steps):
+        v, a = compute_v_and_a(current_window, DT)
+        input_tensor = torch.tensor(np.stack([current_window, v, a]), dtype=torch.float32).unsqueeze(0).to(DEVICE)
 
-with torch.no_grad():
-    for x, y in test_loader:
-        x, y = x.to(DEVICE), y.to(DEVICE)
-        pred = model(x)
-        all_targets.append(y.cpu().numpy())
-        all_preds.append(pred.cpu().numpy())
+        with torch.no_grad():
+            next_x = model(input_tensor).item()
 
-all_targets = np.concatenate(all_targets)
-all_preds = np.concatenate(all_preds)
-mse = np.mean((all_targets - all_preds) ** 2)
-print(f"📉 Test MSE on fresh data: {mse:.6f}")
+        predicted.append(next_x)
+        current_window = np.roll(current_window, -1)
+        current_window[-1] = next_x
 
-# ========= Plot Predictions =========
-# Randomly select which samples to plot
-random_indices = np.random.choice(len(test_dataset), size=NUM_PLOTS, replace=False)
+    predicted = np.array(predicted, dtype=np.float32)
+    print("Shapes:", t.shape, true_x.shape, predicted.shape)
 
-# Time axis for 11 points (0 to 10 steps of dt)
-dt = DEFAULT_DURATION / (DEFAULT_TIME_STEPS - 1)
-t_values = np.linspace(0, dt * 10, 11)
-
-for plot_idx, i in enumerate(random_indices):
-    x, y_true = test_dataset[i]
-    x_vals = x[0].numpy()
-    input_tensor = x.unsqueeze(0).to(DEVICE)
-    y_pred = model(input_tensor).item()
-
-    plt.figure(figsize=(8, 4))
-    plt.plot(t_values[:10], x_vals, marker='o', label="Input x(t)")
-    plt.plot(t_values[10], y_true.item(), 'go', label="True x₁₀")
-    plt.plot(t_values[10], y_pred, 'rx', label="Predicted x₁₀")
-    plt.title(f"Sample #{i+1}")
-    plt.xlabel("Time Step")
-    plt.ylabel("Position x(t)")
+    plt.figure(figsize=(10, 4))
+    plt.plot(t, true_x, label="Analytic Trajectory", linewidth=2)
+    print(true_x)
+    plt.plot(t, predicted, '--', label="Predicted (Multi-step)", linewidth=2)
+    plt.xlabel("Time (s)")
+    plt.ylabel("x(t)")
+    plt.title(f"Rollout from x₀={x0}, v₀={v0}, k={k}")
     plt.grid(True)
     plt.legend()
     plt.show()
+
+
+# ========= MAIN DRIVER =========
+if __name__ == "__main__":
+    MODE = "rollout"  # "batch" / "rollout"
+
+    model = HamiltonPredictorCNN().to(DEVICE)
+    model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
+    print(f"✅ Loaded model from {MODEL_PATH}")
+
+    if MODE == "batch":
+        run_batch_evaluation(model)
+    elif MODE == "rollout":
+        # Try manual or random values
+        x0, v0, k = 2.0, 0.3, 1.2
+        rollout_from_initial_condition(model, x0, v0, k)
