@@ -1,5 +1,3 @@
-# data_hamiltonian.py
-
 import numpy as np
 import pandas as pd
 import os
@@ -7,7 +5,7 @@ import os
 # Constants
 DEFAULT_DURATION = 10.0
 DEFAULT_TIME_STEPS = 100
-SAMPLES = 1000
+SAMPLES = 500
 OUTPUT_CSV = "hamiltonian_dataset.csv"
 
 # Ranges for random initial conditions
@@ -32,16 +30,14 @@ def generate_dataset(num_samples, time_steps=DEFAULT_TIME_STEPS, duration=DEFAUL
 
         x_t = harmonic_trajectory(x0, v0, k, t)
 
-        # Choose a random sub-window of 11 points
-        max_start = len(t) - 11
-        start_idx = np.random.randint(0, max_start + 1)
-        window = x_t[start_idx:start_idx + 11]
-        input_10 = window[:10]
-        target = window[10]
+        # Extract all possible 11-point subwindows
+        for start_idx in range(len(t) - 11 + 1):
+            window = x_t[start_idx:start_idx + 11]
+            input_10 = window[:10]
+            target = window[10]
 
-        # Add x0, v0, k at the beginning of the row
-        row = [x0, v0, k, start_idx] + input_10.tolist() + [target]
-        data.append(row)
+            row = [x0, v0, k, start_idx] + input_10.tolist() + [target]
+            data.append(row)
 
     return np.array(data)
 
