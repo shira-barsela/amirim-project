@@ -102,7 +102,7 @@ def rollout_from_initial_condition(model, x0, v0, k, steps=DEFAULT_TIME_STEPS):
     for ti, tx, px in zip(t, true_x, predicted):
         print(f"{ti:.4f}\t{tx:.6f}\t{px:.6f}")
 
-    end_idx = int(len(t) * 0.6)  # 20% of the total samples
+    end_idx = int(len(t) * 0.5)  # 20% of the total samples
     plt.figure(figsize=(10, 4))
     plt.plot(t[:end_idx], true_x[:end_idx], label="Analytic Trajectory", linewidth=2)
     plt.plot(t[:end_idx], predicted[:end_idx], '--', label="Predicted (Multi-step)", linewidth=2)
@@ -126,9 +126,9 @@ if __name__ == "__main__":
         run_batch_evaluation(model)
     elif MODE == "rollout":
         # Try manual or random values
-        x0, v0, k = 2.0, 0.3, 1.2
-        # x0 = round(random.uniform(*X0_RANGE), 2)
-        # v0 = round(random.uniform(*V0_RANGE), 2)
-        # k = round(random.uniform(*K_RANGE), 2)
+        # x0, v0, k = 2.0, 0.3, 1.2
+        x0 = round(random.uniform(*X0_RANGE), 2)
+        v0 = round(random.uniform(*V0_RANGE), 2)
+        k = round(random.uniform(*K_RANGE), 2)
 
         rollout_from_initial_condition(model, x0, v0, k)
