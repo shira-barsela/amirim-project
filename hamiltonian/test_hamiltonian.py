@@ -95,13 +95,12 @@ def rollout_from_initial_condition(model, x0, v0, k, steps=DEFAULT_TIME_STEPS):
         current_window = np.roll(current_window, -1)
         current_window[-1] = next_x
 
-    predicted = np.array(predicted, dtype=np.float32)
-    print("Shapes:", t.shape, true_x.shape, predicted.shape)
-
+    print("t\ttrue_x\tpredicted")
+    for ti, tx, px in zip(t, true_x, predicted):
+        print(f"{ti:.4f}\t{tx:.6f}\t{px:.6f}")
     plt.figure(figsize=(10, 4))
-    plt.plot(t, true_x, label="Analytic Trajectory", linewidth=2)
-    print(true_x)
-    plt.plot(t, predicted, '--', label="Predicted (Multi-step)", linewidth=2)
+    plt.plot(t.copy(), true_x.copy(), label="Analytic Trajectory", linewidth=2)
+    plt.plot(t.copy(), predicted.copy(), '--', label="Predicted (Multi-step)", linewidth=2)
     plt.xlabel("Time (s)")
     plt.ylabel("x(t)")
     plt.title(f"Rollout from x₀={x0}, v₀={v0}, k={k}")
