@@ -7,6 +7,9 @@ from torch.utils.data import DataLoader, Dataset
 from model_hamiltonian import HamiltonPredictorCNN
 from data_hamiltonian import generate_dataset, harmonic_trajectory, DEFAULT_DURATION, DEFAULT_TIME_STEPS
 from dataset_hamiltonian import compute_v_and_a
+from data_hamiltonian import X0_RANGE, V0_RANGE, K_RANGE
+import random
+
 
 # ========= CONFIG =========
 MODEL_PATH = "models/hamiltonian_cnn.pth"
@@ -98,9 +101,11 @@ def rollout_from_initial_condition(model, x0, v0, k, steps=DEFAULT_TIME_STEPS):
     print("t\ttrue_x\tpredicted")
     for ti, tx, px in zip(t, true_x, predicted):
         print(f"{ti:.4f}\t{tx:.6f}\t{px:.6f}")
+
+    end_idx = int(len(t) * 0.6)  # 20% of the total samples
     plt.figure(figsize=(10, 4))
-    plt.plot(t.copy(), true_x.copy(), label="Analytic Trajectory", linewidth=2)
-    plt.plot(t.copy(), predicted.copy(), '--', label="Predicted (Multi-step)", linewidth=2)
+    plt.plot(t[:end_idx], true_x[:end_idx], label="Analytic Trajectory", linewidth=2)
+    plt.plot(t[:end_idx], predicted[:end_idx], '--', label="Predicted (Multi-step)", linewidth=2)
     plt.xlabel("Time (s)")
     plt.ylabel("x(t)")
     plt.title(f"Rollout from x₀={x0}, v₀={v0}, k={k}")
@@ -122,4 +127,8 @@ if __name__ == "__main__":
     elif MODE == "rollout":
         # Try manual or random values
         x0, v0, k = 2.0, 0.3, 1.2
+        # x0 = round(random.uniform(*X0_RANGE), 2)
+        # v0 = round(random.uniform(*V0_RANGE), 2)
+        # k = round(random.uniform(*K_RANGE), 2)
+
         rollout_from_initial_condition(model, x0, v0, k)
