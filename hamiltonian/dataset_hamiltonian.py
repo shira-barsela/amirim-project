@@ -3,6 +3,7 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
+WINDOW_LEN = 15
 
 # ------------------------------
 # Finite-difference helpers
@@ -84,7 +85,7 @@ class HamiltonFullDataset(Dataset):
     def __init__(
         self,
         csv_path: str,
-        window_len: int = 10,
+        window_len: int = WINDOW_SIZE,
         horizon: int = 1,
         stride: int = 1,
         duration: float = 10.0,

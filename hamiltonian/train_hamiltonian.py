@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, random_split
 
-from dataset_hamiltonian import HamiltonFullDataset, compute_v_and_a_torch
+from dataset_hamiltonian import HamiltonFullDataset, compute_v_and_a_torch, WINDOW_LEN
 from model_hamiltonian import HamiltonPredictorCNN
 
 # ========== CONFIG ==========
@@ -38,7 +38,7 @@ def harmonic_next_x_batch(x0: torch.Tensor,
                           dt: float) -> torch.Tensor:
     """
     x0, v0, k : (B,) tensors
-    idxs      : (B,) integer absolute indices (e.g., start_idx + 10 + r)
+    idxs      : (B,) integer absolute indices (e.g., start_idx + WINDOW_LEN + r)
     dt        : scalar float (dataset dt)
     returns   : x(t[idxs]) as (B,) tensor
     """
@@ -50,7 +50,7 @@ def harmonic_next_x_batch(x0: torch.Tensor,
 # ========== LOAD DATA ==========
 full_dataset = HamiltonFullDataset(
     csv_path=FULL_CSV_PATH,
-    window_len=10,
+    window_len=WINDOW_LEN,
     horizon=1,
     stride=1,
     return_meta=True  # needed for rollout supervision
@@ -83,7 +83,7 @@ if TRAIN_FROM_SCRATCH or CONTINUE_TRAINING:
         for batch in train_loader:
             # Unpack with meta (since return_meta=True)
             inputs, target, meta = batch
-            inputs = inputs.to(DEVICE)   # (B, 3, 10)
+            inputs = inputs.to(DEVICE)   # (B, 3, WINDOW_LEN)
             target = target.to(DEVICE)   # (B,)
 
             x0_b     = meta["x0"].to(DEVICE)       # (B,)
@@ -102,11 +102,11 @@ if TRAIN_FROM_SCRATCH or CONTINUE_TRAINING:
             # ===== Short rollout loss (R_ROLLOUT) =====
             rollout_loss = 0.0
 
-            # Current x-window (B,10) from input's x-channel
-            x_win = inputs[:, 0, :].clone()        # (B,10)
+            # Current x-window (B,WINDOW_LEN) from input's x-channel
+            x_win = inputs[:, 0, :].clone()        # (B,WINDOW_LEN)
 
             # Absolute index of the first target (the one we just used)
-            base_next_idx = start_b + 10           # (B,)
+            base_next_idx = start_b + WINDOW_LEN           # (B,)
 
             # Step 1 already predicted — roll window forward by appending pred_next
             x_win = torch.cat([x_win[:, 1:], pred_next.unsqueeze(1)], dim=1)
@@ -119,8 +119,8 @@ if TRAIN_FROM_SCRATCH or CONTINUE_TRAINING:
                     break
 
                 # Build next input from current window
-                v_win, a_win = compute_v_and_a_torch(x_win, full_dataset.dt)  # (B,10) each
-                in_batch = torch.stack([x_win, v_win, a_win], dim=1)          # (B,3,10)
+                v_win, a_win = compute_v_and_a_torch(x_win, full_dataset.dt)  # (B,WINDOW_LEN) each
+                in_batch = torch.stack([x_win, v_win, a_win], dim=1)          # (B,3,WINDOW_LEN)
 
                 pred_delta_r = model(in_batch)            # (B,)
                 last_x_r = x_win[:, -1]                   # (B,)

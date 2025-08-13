@@ -5,7 +5,7 @@ class HamiltonPredictorCNN(nn.Module):
     def __init__(self):
         super().__init__()
         self.net = nn.Sequential(
-            # Input: (batch_size, 3, 10)
+            # Input: (batch_size, 3, WINDOW_SIZE)
             nn.Conv1d(in_channels=3, out_channels=32, kernel_size=3, padding=1),
             nn.ReLU(),
 
@@ -15,7 +15,7 @@ class HamiltonPredictorCNN(nn.Module):
             nn.Conv1d(in_channels=64, out_channels=64, kernel_size=3, padding=1),
             nn.ReLU(),
 
-            nn.Flatten(),  # shape becomes (batch_size, 64*10 = 640)
+            nn.Flatten(),  # shape becomes (batch_size, 64*WINDOW_SIZE = 640)
             nn.Linear(640, 64),
             nn.ReLU(),
             nn.Linear(64, 1)  # Output: predicted next x(t)

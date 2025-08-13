@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader, Dataset
 from model_hamiltonian import HamiltonPredictorCNN
 from data_hamiltonian import generate_dataset, harmonic_trajectory, DEFAULT_DURATION, DEFAULT_TIME_STEPS
-from dataset_hamiltonian import compute_v_and_a
+from dataset_hamiltonian import compute_v_and_a, WINDOW_LEN
 from data_hamiltonian import X0_RANGE, V0_RANGE, K_RANGE
 import random
 
@@ -57,7 +57,7 @@ def run_batch_evaluation(model, num_trajectories=50, num_plots=5, batch_size=64)
 
     print("📈 Plotting random samples...")
     indices = np.random.choice(len(dataset), size=num_plots, replace=False)
-    t_values = np.linspace(0, DT * 10, 11)
+    t_values = np.linspace(0, DT * WINDOW_LEN, WINDOW_LEN+1)
 
     for i, idx in enumerate(indices):
         x, y_true = dataset[idx]
@@ -67,9 +67,9 @@ def run_batch_evaluation(model, num_trajectories=50, num_plots=5, batch_size=64)
         y_pred = x_vals[-1] + pred_delta
 
         plt.figure(figsize=(8, 4))
-        plt.plot(t_values[:10], x_vals, marker='o', label="Input x(t)")
-        plt.plot(t_values[10], y_true.item(), 'go', label="True x₁₀")
-        plt.plot(t_values[10], y_pred, 'rx', label="Predicted x₁₀")
+        plt.plot(t_values[:WINDOW_LEN], x_vals, marker='o', label="Input x(t)")
+        plt.plot(t_values[WINDOW_LEN], y_true.item(), 'go', label="True x₁₀")
+        plt.plot(t_values[WINDOW_LEN], y_pred, 'rx', label="Predicted x₁₀")
         plt.title(f"Sample #{i+1} (Index {idx})")
         plt.xlabel("Time (s)")
         plt.ylabel("Position x(t)")
@@ -128,9 +128,9 @@ if __name__ == "__main__":
         run_batch_evaluation(model)
     elif MODE == "rollout":
         # Try manual or random values
-        # x0, v0, k = 2.0, 0.3, 1.2
-        x0 = round(random.uniform(*X0_RANGE), 2)
-        v0 = round(random.uniform(*V0_RANGE), 2)
-        k = round(random.uniform(*K_RANGE), 2)
+        x0, v0, k = 2.0, 0.3, 1.2
+        # x0 = round(random.uniform(*X0_RANGE), 2)
+        # v0 = round(random.uniform(*V0_RANGE), 2)
+        # k = round(random.uniform(*K_RANGE), 2)
 
         rollout_from_initial_condition(model, x0, v0, k)
