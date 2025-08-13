@@ -1,7 +1,13 @@
-
+8/8/25
 commit id - eb235b73eb20c324830199de67cd35c14b052743
     a first version of the network and all needed.
     we can see that after 2-4 seconds the predict trajectory
     is getting away from the true one, and little bit after
     the numbers are getting crazy.
 
+13/8/25
+commit id - 186cd3129a4ba77d5e9b1839d5809f78dabc7bf1
+    Improve of the network. It create better trajectories,
+    still not close enough to the origin.
+    The process can work with any window length, just need
+    to work organize with the models files.

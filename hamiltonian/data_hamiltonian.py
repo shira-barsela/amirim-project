@@ -3,8 +3,8 @@ import pandas as pd
 import os
 
 # Constants
-DEFAULT_DURATION = 10.0
-DEFAULT_TIME_STEPS = 100
+DEFAULT_DURATION = 20.0
+DEFAULT_TIME_STEPS = 200
 NUM_TRAJECTORIES = 500
 OUTPUT_CSV = "hamiltonian_dataset.csv"
 OUTPUT_FULL_CSV = "hamiltonian_full.csv"

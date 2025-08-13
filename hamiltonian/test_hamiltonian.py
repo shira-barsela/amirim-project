@@ -128,7 +128,8 @@ if __name__ == "__main__":
         run_batch_evaluation(model)
     elif MODE == "rollout":
         # Try manual or random values
-        # x0, v0, k = 2.0, 0.3, 1.2
+        # x0, v0, k = 2.0, 0.3, 1.2  # general example
+        # xo, v0, k = -1.96, -0.55, 2.94  # good example
         x0 = round(random.uniform(*X0_RANGE), 2)
         v0 = round(random.uniform(*V0_RANGE), 2)
         k = round(random.uniform(*K_RANGE), 2)
