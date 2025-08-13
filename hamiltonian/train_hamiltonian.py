@@ -1,5 +1,3 @@
-# train_hamiltonian.py
-
 import os
 import torch
 import torch.nn as nn
@@ -13,7 +11,7 @@ from model_hamiltonian import HamiltonPredictorCNN
 CSV_PATH = "data/hamiltonian_dataset.csv"  # (kept for reference; not used with HamiltonFullDataset)
 FULL_CSV_PATH = "data/hamiltonian_full.csv"
 
-MODEL_PATH = "hamiltonian_cnn.pth"
+MODEL_PATH = "models/hamiltonian_cnn.pth"
 BATCH_SIZE = 64
 EPOCHS = 30
 LR = 1e-3

@@ -1,5 +1,3 @@
-# test_hamiltonian.py
-
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
@@ -106,7 +104,7 @@ def rollout_from_initial_condition(model, x0, v0, k, steps=DEFAULT_TIME_STEPS):
     for ti, tx, px in zip(t, true_x, predicted):
         print(f"{ti:.4f}\t{tx:.6f}\t{px:.6f}")
 
-    end_idx = int(len(t) * 0.5)  # 20% of the total samples
+    end_idx = int(len(t) * 1.0)  # 100% of the total samples
     plt.figure(figsize=(10, 4))
     plt.plot(t[:end_idx], true_x[:end_idx], label="Analytic Trajectory", linewidth=2)
     plt.plot(t[:end_idx], predicted[:end_idx], '--', label="Predicted (Multi-step)", linewidth=2)
