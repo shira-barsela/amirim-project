@@ -46,7 +46,9 @@ def run_batch_evaluation(model, num_trajectories=50, num_plots=5, batch_size=64)
     with torch.no_grad():
         for x, y in loader:
             x, y = x.to(DEVICE), y.to(DEVICE)
-            pred = model(x)
+            pred_delta = model(x)
+            last_x = x[:, 0, -1]
+            pred = last_x + pred_delta
             all_targets.append(y.cpu().numpy())
             all_preds.append(pred.cpu().numpy())
 
@@ -63,7 +65,8 @@ def run_batch_evaluation(model, num_trajectories=50, num_plots=5, batch_size=64)
         x, y_true = dataset[idx]
         x_vals = x[0].numpy()
         input_tensor = x.unsqueeze(0).to(DEVICE)
-        y_pred = model(input_tensor).item()
+        pred_delta = model(input_tensor).item()
+        y_pred = x_vals[-1] + pred_delta
 
         plt.figure(figsize=(8, 4))
         plt.plot(t_values[:10], x_vals, marker='o', label="Input x(t)")
@@ -92,7 +95,8 @@ def rollout_from_initial_condition(model, x0, v0, k, steps=DEFAULT_TIME_STEPS):
         input_tensor = torch.tensor(np.stack([current_window, v, a]), dtype=torch.float32).unsqueeze(0).to(DEVICE)
 
         with torch.no_grad():
-            next_x = model(input_tensor).item()
+            pred_delta = model(input_tensor).item()
+        next_x = float(current_window[-1]) + pred_delta
 
         predicted.append(next_x)
         current_window = np.roll(current_window, -1)

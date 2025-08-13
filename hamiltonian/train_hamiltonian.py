@@ -51,8 +51,11 @@ if TRAIN_FROM_SCRATCH or CONTINUE_TRAINING:
             inputs, target = inputs.to(DEVICE), target.to(DEVICE)
 
             optimizer.zero_grad()
-            output = model(inputs)
-            loss = loss_fn(output, target)
+            # inputs shape: (B, 3, 10) with channel 0 = x
+            last_x = inputs[:, 0, -1]  # (B,)
+            pred_delta = model(inputs)  # (B,)  -> predicts Δx
+            pred_next = last_x + pred_delta  # (B,)  -> reconstruct next x
+            loss = loss_fn(pred_next, target)  # train on absolute next x as usual
             loss.backward()
             optimizer.step()
 
@@ -66,8 +69,11 @@ if TRAIN_FROM_SCRATCH or CONTINUE_TRAINING:
         with torch.no_grad():
             for inputs, target in val_loader:
                 inputs, target = inputs.to(DEVICE), target.to(DEVICE)
-                output = model(inputs)
-                loss = loss_fn(output, target)
+                # inputs shape: (B, 3, 10) with channel 0 = x
+                last_x = inputs[:, 0, -1]  # (B,)
+                pred_delta = model(inputs)  # (B,)  -> predicts Δx
+                pred_next = last_x + pred_delta  # (B,)  -> reconstruct next x
+                loss = loss_fn(pred_next, target)  # train on absolute next x as usual
                 val_loss += loss.item() * inputs.size(0)
         avg_val_loss = val_loss / val_size
 
