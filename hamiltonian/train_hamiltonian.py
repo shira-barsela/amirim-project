@@ -17,7 +17,7 @@ LR = 1e-3
 USE_CUDA = torch.cuda.is_available()
 DEVICE = torch.device("cuda" if USE_CUDA else "cpu")
 
-TRAIN_FROM_SCRATCH = False
+TRAIN_FROM_SCRATCH = True
 CONTINUE_TRAINING = True
 VAL_SPLIT = 0.1
 
@@ -39,7 +39,7 @@ if os.path.exists(os.path.join("models", MODEL_PATH)) and not TRAIN_FROM_SCRATCH
 
 # ========== TRAINING ==========
 if TRAIN_FROM_SCRATCH or CONTINUE_TRAINING:
-    optimizer = optim.Adam(model.parameters(), lr=LR)
+    optimizer = optim.Adam(model.parameters(), lr=LR, weight_decay=1e-4)
     loss_fn = nn.MSELoss()
 
     print("🚀 Starting training...")
