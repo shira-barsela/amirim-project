@@ -13,7 +13,7 @@ FULL_CSV_PATH = "data/hamiltonian_full.csv"
 
 MODEL_PATH = "hamiltonian_cnn.pth"
 BATCH_SIZE = 64
-EPOCHS = 30
+EPOCHS = 25 # was 30
 LR = 1e-3
 WEIGHT_DECAY = 1e-4
 
