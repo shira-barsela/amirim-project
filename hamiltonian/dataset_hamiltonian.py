@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
+from data_hamiltonian import DEFAULT_TIME_STEPS
 
 WINDOW_LEN = 15
 
@@ -85,11 +86,11 @@ class HamiltonFullDataset(Dataset):
     def __init__(
         self,
         csv_path: str,
-        window_len: int = WINDOW_SIZE,
+        window_len: int = WINDOW_LEN,
         horizon: int = 1,
         stride: int = 1,
         duration: float = 10.0,
-        time_steps: int = 100,
+        time_steps: int = DEFAULT_TIME_STEPS,
         return_meta: bool = False,
         random_windows: bool = False
     ):

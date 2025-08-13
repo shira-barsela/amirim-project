@@ -2,24 +2,31 @@ import torch
 import torch.nn as nn
 
 class HamiltonPredictorCNN(nn.Module):
-    def __init__(self):
+    def __init__(self, window_len=15):
         super().__init__()
-        self.net = nn.Sequential(
-            # Input: (batch_size, 3, WINDOW_SIZE)
-            nn.Conv1d(in_channels=3, out_channels=32, kernel_size=3, padding=1),
-            nn.ReLU(),
+        self.convs = nn.Sequential(
+            nn.Conv1d(3, 64, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv1d(64, 64, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv1d(64, 128, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+        )
 
-            nn.Conv1d(in_channels=32, out_channels=64, kernel_size=3, padding=1),
-            nn.ReLU(),
+        # probe size
+        with torch.no_grad():
+            dummy = torch.zeros(1, 3, window_len)
+            conv_out = self.convs(dummy)      # (1, C, L)
+            flat_dim = conv_out.numel()       # C*L
 
-            nn.Conv1d(in_channels=64, out_channels=64, kernel_size=3, padding=1),
-            nn.ReLU(),
-
-            nn.Flatten(),  # shape becomes (batch_size, 64*WINDOW_SIZE = 640)
-            nn.Linear(640, 64),
-            nn.ReLU(),
-            nn.Linear(64, 1)  # Output: predicted next x(t)
+        self.mlp = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(flat_dim, 64),
+            nn.ReLU(inplace=True),
+            nn.Linear(64, 1),
         )
 
     def forward(self, x):
-        return self.net(x).squeeze(1)  # Output shape: (batch_size,)
+        h = self.convs(x)
+        out = self.mlp(h)
+        return out.squeeze(-1)

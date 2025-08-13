@@ -84,11 +84,11 @@ def rollout_from_initial_condition(model, x0, v0, k, steps=DEFAULT_TIME_STEPS):
     print("duration: ", DT * (steps - 1), ", steps: ", steps)
     true_x = harmonic_trajectory(x0, v0, k, t)
 
-    current_window = true_x[:10].astype(np.float32).copy()
+    current_window = true_x[:WINDOW_LEN].astype(np.float32).copy()
     predicted = list(current_window)
 
     model.eval()
-    for i in range(10, steps):
+    for i in range(WINDOW_LEN, steps):
         v, a = compute_v_and_a(current_window, DT)
         input_tensor = torch.tensor(np.stack([current_window, v, a]), dtype=torch.float32).unsqueeze(0).to(DEVICE)
 
@@ -128,9 +128,9 @@ if __name__ == "__main__":
         run_batch_evaluation(model)
     elif MODE == "rollout":
         # Try manual or random values
-        x0, v0, k = 2.0, 0.3, 1.2
-        # x0 = round(random.uniform(*X0_RANGE), 2)
-        # v0 = round(random.uniform(*V0_RANGE), 2)
-        # k = round(random.uniform(*K_RANGE), 2)
+        # x0, v0, k = 2.0, 0.3, 1.2
+        x0 = round(random.uniform(*X0_RANGE), 2)
+        v0 = round(random.uniform(*V0_RANGE), 2)
+        k = round(random.uniform(*K_RANGE), 2)
 
         rollout_from_initial_condition(model, x0, v0, k)
