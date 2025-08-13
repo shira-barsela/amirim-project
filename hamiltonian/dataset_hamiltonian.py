@@ -114,7 +114,7 @@ class HamiltonFullDataset(Dataset):
         # precompute indices if using deterministic windows
         self.index = []
         if not self.random_windows:
-            max_start = self.time_steps - self.window_len - (self.horizon - 1)
+            max_start = self.time_steps - self.window_len - self.horizon
             max_start = max(0, max_start)
             for tid in range(len(self.X)):
                 for s in range(0, max_start + 1, self.stride):
@@ -122,7 +122,7 @@ class HamiltonFullDataset(Dataset):
 
     def __len__(self):
         if self.random_windows:
-            max_start = self.time_steps - self.window_len - (self.horizon - 1)
+            max_start = self.time_steps - self.window_len - self.horizon
             max_start = max(1, max_start)
             # effective epoch length: trajectories × valid starts
             return max(len(self.X) * max_start, 1)
@@ -131,7 +131,7 @@ class HamiltonFullDataset(Dataset):
     def __getitem__(self, idx):
         if self.random_windows:
             tid = np.random.randint(0, len(self.X))
-            max_start = self.time_steps - self.window_len - (self.horizon - 1)
+            max_start = self.time_steps - self.window_len - self.horizon
             s = np.random.randint(0, max_start + 1)
         else:
             tid, s = self.index[idx]
@@ -140,6 +140,8 @@ class HamiltonFullDataset(Dataset):
         x_seq = self.X[tid, s : s + self.window_len]  # (W,)
         tgt_idx = s + self.window_len + self.horizon - 1
         target = self.X[tid, tgt_idx].astype(np.float32)
+
+        assert 0 <= tgt_idx < self.time_steps, f"tgt_idx {tgt_idx} out of bounds for T={self.time_steps}"
 
         # derivatives via shared helper
         v, a = compute_v_and_a(x_seq, self.dt)  # numpy outputs
