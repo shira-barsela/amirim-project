@@ -12,11 +12,11 @@ def delta_approx(x: float) -> float:
 
 def delta_prime(x: float) -> float:
     """Approximation of δ'(x)"""
-    return -2 * x / (EPS**2) * delta_approx(x, EPS)
+    return -2 * x / (EPS**2) * delta_approx(x)
 
 def delta_double_prime(x: float) -> float:
     """Approximation of δ''(x)"""
-    return (4 * x**2 / EPS**4 - 2 / EPS**2) * delta_approx(x, EPS)
+    return (4 * x**2 / EPS**4 - 2 / EPS**2) * delta_approx(x)
 
 def harmonic_function(x: float) -> float:
     """
@@ -36,7 +36,7 @@ def zero_f(t: float) -> float:
 def int_to_time(i: int) -> float:
     return i * cons.DELTA_T
 
-def G_function_by_indexes(g: Callable[[float], float], t1: int, t2: int) -> float:
+def g_function_by_ind(g: Callable[[float], float], t1: int, t2: int) -> float:
     return g(int_to_time(t1) - int_to_time(t2))
 
 
