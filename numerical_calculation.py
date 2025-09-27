@@ -17,7 +17,7 @@ def fill_f_array(f_array, f: Callable[[float], float]) -> None:
 def calc_xi(i: int) -> None:
     fi = f_array[i] # sum = f[i]
     if i == 0:
-        return fi
+        x_array[0] = cons.X0
     sum = 0
     sum += func.G_function_by_indexes(i, 0) * x_array[0] / 2
 
