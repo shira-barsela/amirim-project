@@ -36,8 +36,9 @@ def zero_f(t: float) -> float:
 def int_to_time(i: int) -> float:
     return i * cons.DELTA_T
 
-def g_function_by_ind(g: Callable[[float], float], t1: int, t2: int) -> float:
-    return g(int_to_time(t1) - int_to_time(t2))
+def g_function_by_ind(g: Callable[[float], float], i: int, j: int) -> float:
+    tau = (i - j) * cons.DELTA_T + cons.SHIFT
+    return g(tau)
 
 
 

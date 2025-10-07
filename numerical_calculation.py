@@ -135,8 +135,8 @@ def visualize_kernel_and_x(i: int, g_func, x_array: np.ndarray, title_prefix: st
 
 if __name__ == "__main__":
     # define G_function_by_indexes with the current G function
-    def g_by_idx(t1: int, t2: int) -> float:
-        return func.g_function_by_ind(g_chosen_func, t1, t2)
+    def g_by_idx(i: int, j: int) -> float:
+        return func.g_function_by_ind(g_chosen_func, i, j)
 
     # fill f array
     fill_f_array(f_array, f_func)
