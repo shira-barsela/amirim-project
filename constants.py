@@ -1,10 +1,13 @@
+import math
+
 DURATION = 25.0
 TIME_STEPS = 250
 DELTA_T = DURATION / TIME_STEPS
 WARMUP_SECONDS = 5.0
 WARMUP_STEPS = int(WARMUP_SECONDS / DELTA_T)
 EPS = 4 * DELTA_T
-SHIFT = 2 * EPS
-M = 1
+TOL = 0.001
+SHIFT = EPS * math.sqrt(math.log(1/TOL))
+M = 0.1
 K = 1
 X0 = 1.0
