@@ -150,4 +150,4 @@ if __name__ == "__main__":
     # plot_x_array()
 
     # visualize at a few steps
-    visualize_kernel_and_x(i=cons.WARMUP_STEPS+20, g_func=g_by_idx, x_array=x_array, title_prefix="EPS-tuning: ")
+    visualize_kernel_and_x(i=cons.WARMUP_STEPS+1, g_func=g_by_idx, x_array=x_array, title_prefix="EPS-tuning: ")

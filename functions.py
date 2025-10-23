@@ -20,10 +20,10 @@ def delta_double_prime(x: float) -> float:
 
 def harmonic_function(x: float) -> float:
     """
-    U = 0.5kx^2 --> U` = kx & -U` = mx``
-    x`` = ∫ x(t) δ``(t) dt
+    U(x) = 0.5kx^2 --> U`(x) = kx(t) & -U` = mx``
+    x``(t) = ∫ x(t) δ``(t) dt
     -->  -U`(x) = ∫ x(t') m δ``(t'-t) dt'
-    -->  x(t) = U`/k = - ∫ x(t') m δ``(t'-t) dt' / k
+    -->  x(t) = U`(x)/k = - ∫ x(t') m δ``(t'-t) dt' / k
                      = ∫ x(t') (-m/k) δ``(t'-t) dt'
     """
     return (-cons.M/cons.K) * delta_double_prime(x)
